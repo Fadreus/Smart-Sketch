@@ -12,7 +12,6 @@ from test import run
 import tornado.ioloop
 import tornado.options
 import tornado.web
-
 import signal
 
 from color_grey_conversion import color_to_grey
@@ -20,6 +19,8 @@ from color_grey_conversion import color_to_grey
 IMG_FOLDER = os.path.join(os.path.dirname(__file__), "dataset/val_img")
 INST_FOLDER = os.path.join(os.path.dirname(__file__), "dataset/val_inst")
 LABEL_FOLDER = os.path.join(os.path.dirname(__file__), "dataset/val_label")
+
+verbose = ((sys.argv[1] if 1 < len(sys.argv) else "")=="verbose")
 
 STATIC_FOLDER = os.path.join(os.path.dirname(__file__), 'static')
 
@@ -57,7 +58,7 @@ def run_model(filename):
     # TODO make is it so that concurrent users won't mess with eachother :P aka have hashed or something dataset routes...
     # that will also take a lot of cleaning up...
     # TODO figure out how to not do this from the command line...
-    return run()
+    return run(verbose=verbose)
 
 
 def copy_file(old="avon.png", new="avon.png"):
@@ -70,7 +71,8 @@ def make_processable(greyscale_fname, output_color_file):
     ouptut_greyscale_file = INST_FOLDER + "/" + greyscale_fname
 
     # Converts the file to greyscale and saves it to the inst folder?
-    print(output_color_file, ouptut_greyscale_file)
+    if verbose:
+        print(output_color_file, ouptut_greyscale_file)
     color_to_grey.convert_rgb_image_to_greyscale(
         output_color_file,
         ouptut_greyscale_file
@@ -114,9 +116,11 @@ class UploadHandler(tornado.web.RequestHandler):
 
         # We shouldnt need to pass it a string anymore
         export_image_location = run_model(greyscale_fname)
-        print(export_image_location)
+        if verbose:
+            print(export_image_location)
         static_image_location = parse_static_filepath(export_image_location)
-        print(static_image_location)
+        if verbose:
+            print(static_image_location)
 
         self.write({
             "result": "success",
@@ -176,11 +180,11 @@ class MainApplication(tornado.web.Application):
             self.logger.fatal("Unable to listen on {}:{} = {}".format(
                 self.address, self.port, e))
             sys.exit(1)
-
         self.ioloop.start()
 
 
 if __name__ == "__main__":
+
     check_for_dataset_folder()
     tornado.options.define(
         "debug",
@@ -188,12 +192,16 @@ if __name__ == "__main__":
         help="Enable debugging mode."
     )
     tornado.options.define('port', default=80, help='Port to listen on.')
-    tornado.options.define('address', default="127.0.0.1", help='Url')
+    host = "0.0.0.0"
+    if sys.platform == "win32":
+        host = "127.0.0.1"
+    tornado.options.define('address', default=host, help='Url')
 
     tornado.options.define('template_path', default=os.path.join(
         os.path.dirname(__file__), "templates"), help='Path to templates')
     tornado.options.parse_command_line()
     options = tornado.options.options.as_dict()
-    print(options)
+    if verbose:
+        print(options)
     app = MainApplication(**options)
     app.run()
